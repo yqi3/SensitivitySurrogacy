@@ -43,7 +43,7 @@ mu_s_x_partial_id <- function(mu_type, S, X, varrho_s_x_out, eta = NULL, data_tr
         eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = new_data)$predictions, prop_ub), prop_lb)
       } else if (type_prop == "xgboost") {
         new_data <- as.matrix(t(named_values))
-        eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = new_data), prop_ub), prop_lb)
+        eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(new_data)), prop_ub), prop_lb)
       }
     } else {
       if (type_prop == "glmnet") {
@@ -54,7 +54,7 @@ mu_s_x_partial_id <- function(mu_type, S, X, varrho_s_x_out, eta = NULL, data_tr
         eta <- pmax(pmin(predict(varrho_s_x_out, newdata = new_data)$predictions, prop_ub), prop_lb)
       } else if (type_prop == "xgboost") {
         new_data <- as.matrix(t(named_values))
-        eta <- pmax(pmin(predict(varrho_s_x_out, newdata = new_data), prop_ub), prop_lb)
+        eta <- pmax(pmin(predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(new_data)), prop_ub), prop_lb)
       }
     }
   } else {
@@ -97,7 +97,10 @@ bar_mu_x_partial_id <- function(mu_type, data_train, treatment_val, S_vars, X_va
       } else if (type_prop == "grf") {
         etas[test_idx] <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = test_s_x)$predictions, prop_ub), prop_lb)
       } else if (type_prop == "xgboost") {
-        etas[test_idx] <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = test_s_x[, varrho_s_x_out$feature_names]), prop_ub), prop_lb)
+        test_mat <- data.matrix(test_s_x[, c(S_vars, X_vars)])
+        etas[test_idx] <- 1 - pmax(pmin(
+          predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(test_mat)),
+          prop_ub), prop_lb)
       }
     } else if (mu_type %in% c("0U", "0L")) {
       if (type_prop == "glmnet") {
@@ -105,7 +108,10 @@ bar_mu_x_partial_id <- function(mu_type, data_train, treatment_val, S_vars, X_va
       } else if (type_prop == "grf") {
         etas[test_idx] <- pmax(pmin(predict(varrho_s_x_out, newdata = test_s_x)$predictions, prop_ub), prop_lb)
       } else if (type_prop == "xgboost") {
-        etas[test_idx] <- pmax(pmin(predict(varrho_s_x_out, newdata = test_s_x[, varrho_s_x_out$feature_names]), prop_ub), prop_lb)
+        test_mat <- data.matrix(test_s_x[, c(S_vars, X_vars)])
+        etas[test_idx] <- pmax(pmin(
+          predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(test_mat)),
+          prop_ub), prop_lb)
       }
     }
   }
@@ -133,21 +139,24 @@ bar_mu_x_partial_id <- function(mu_type, data_train, treatment_val, S_vars, X_va
   } else if(type == "grf"){
     bar_mu_x_model <- grf::regression_forest(X = as.matrix(x), Y = as.matrix(mu_x_pred), num.threads = grf_num_threads,
                                ci.group.size = 1, honesty = grf_honesty, tune.parameters = grf_tune_parameters)
-  } else if(type == "xgboost"){
+  } else if (type == "xgboost") {
     x_mat <- as.matrix(x)
     storage.mode(x_mat) <- "double"
     mu_vec <- as.numeric(mu_x_pred)
+    dtrain <- xgboost::xgb.DMatrix(data = x_mat, label = mu_vec)
     cv_fit <- xgboost::xgb.cv(
-        data = x_mat,
-        label = mu_vec,
+      data = dtrain,
+      params = list(
         objective = "reg:squarederror",
         max_depth = xgb_max_depth,
         eta = xgb_eta,
-        nthread = xgb_threads,
-        nrounds = xgb_cv_rounds,
-        verbose = FALSE,
-        nfold = nuisance_cv_fold
-        )
+        nthread = xgb_threads
+      ),
+      nrounds = xgb_cv_rounds,
+      nfold = nuisance_cv_fold,
+      verbose = FALSE
+    )
+    
     best_nrounds <- cv_fit$best_iteration
     if (is.null(best_nrounds) || !is.finite(best_nrounds) || best_nrounds < 1L) {
       best_nrounds <- which.min(cv_fit$evaluation_log$test_rmse_mean)
@@ -155,13 +164,15 @@ bar_mu_x_partial_id <- function(mu_type, data_train, treatment_val, S_vars, X_va
     if (!is.finite(best_nrounds) || best_nrounds < 1L) {
       best_nrounds <- xgb_cv_rounds
     }
-    bar_mu_x_model <- xgboost::xgboost(
-      data = x_mat,
-      label = mu_vec,
-      objective = "reg:squarederror",
-      max_depth = xgb_max_depth,
-      eta = xgb_eta,
-      nthread = xgb_threads,
+    
+    bar_mu_x_model <- xgboost::xgb.train(
+      data = dtrain,
+      params = list(
+        objective = "reg:squarederror",
+        max_depth = xgb_max_depth,
+        eta = xgb_eta,
+        nthread = xgb_threads
+      ),
       nrounds = best_nrounds,
       verbose = FALSE
     )
@@ -183,7 +194,9 @@ q_s_x <- function(q_type, data_train, S_vars, X_vars, Y_var, type_prop, prop_ub,
     } else if (type_prop == "grf") {
       eta <- as.numeric(1-pmax(pmin(predict(varrho_s_x_out, newdata = t(as.matrix(c(S,X))))$predictions, prop_ub), prop_lb))
     } else if (type_prop == "xgboost") {
-      eta <- as.numeric(1-pmax(pmin(predict(varrho_s_x_out, newdata = t(as.matrix(c(S,X)))), prop_ub), prop_lb))
+      eta <- as.numeric(1-pmax(pmin(
+        predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(data = t(data.matrix(c(S,X))))),
+        prop_ub), prop_lb))
     }
   } else {
     if (type_prop == "glmnet") {
@@ -191,7 +204,9 @@ q_s_x <- function(q_type, data_train, S_vars, X_vars, Y_var, type_prop, prop_ub,
     } else if (type_prop == "grf") {
       eta <- as.numeric(pmax(pmin(predict(varrho_s_x_out, newdata = t(as.matrix(c(S,X))))$predictions, prop_ub), prop_lb))
     } else if (type_prop == "xgboost") {
-      eta <- as.numeric(pmax(pmin(predict(varrho_s_x_out, newdata = t(as.matrix(c(S,X)))), prop_ub), prop_lb))
+      eta <- as.numeric(pmax(pmin(
+        predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(data = t(data.matrix(c(S,X))))),
+        prop_ub), prop_lb))
     }
   }
 

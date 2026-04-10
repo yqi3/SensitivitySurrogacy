@@ -84,11 +84,11 @@
 #' Long-Term Treatment Effects. arXiv:2603.00580.
 
 longterm_partial_id <- function(data, S_vars, X_vars, Y_var, type, type_prop,
-                      prop_lb = 0.01, prop_ub = 0.99, alpha = 0.05,
-                      cross_fit_fold = 5, nuisance_cv_fold = 5,
-                      grf_honesty = TRUE, grf_tune_parameters = "all",
-                      grf_num_threads = 1, xgb_cv_rounds = 100, xgb_eta = 0.1,
-                      xgb_max_depth = 2, xgb_threads = 1){
+                                prop_lb = 0.01, prop_ub = 0.99, alpha = 0.05,
+                                cross_fit_fold = 5, nuisance_cv_fold = 5,
+                                grf_honesty = TRUE, grf_tune_parameters = "all",
+                                grf_num_threads = 1, xgb_cv_rounds = 100, xgb_eta = 0.1,
+                                xgb_max_depth = 2, xgb_threads = 1){
   .validate_longterm_partial_id_inputs(
     data = data,
     S_vars = S_vars,
@@ -123,35 +123,35 @@ longterm_partial_id <- function(data, S_vars, X_vars, Y_var, type, type_prop,
   # Compute the estimate of tau (upper or lower)
   hat_tau_upper   <- compute_tau_partial_id(data_nuisance, Y_var, "upper")
   hat_tau_lower   <- compute_tau_partial_id(data_nuisance, Y_var, "lower")
-
+  
   # Compute the standard error and construct confidence intervals for bounds
   se_ci <- compute_bound_ci_partial_id(hat_tau_upper, data_nuisance, Y_var, "upper", alpha)
   se_upper    <- se_ci$se
   ci_upper    <- se_ci$ci
-
+  
   se_ci <- compute_bound_ci_partial_id(hat_tau_lower, data_nuisance, Y_var, "lower", alpha)
   se_lower    <- se_ci$se
   ci_lower    <- se_ci$ci
-
+  
   return(list(hat_tau_upper = hat_tau_upper, se_upper = se_upper, ci_upper = ci_upper, hat_tau_lower = hat_tau_lower, se_lower = se_lower, ci_lower = ci_lower))
 }
 
 compute_nuisance_on_fold_partial_id <- function(i, data, folds, S_vars, X_vars, Y_var, type, type_prop,
-                                     prop_lb, prop_ub, cross_fit_fold, nuisance_cv_fold,
-                                     grf_honesty, grf_tune_parameters, grf_num_threads,
-                                     xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads){
+                                                prop_lb, prop_ub, cross_fit_fold, nuisance_cv_fold,
+                                                grf_honesty, grf_tune_parameters, grf_num_threads,
+                                                xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads){
   print(paste0("------Estimating fold ", i, "/", cross_fit_fold, "------"))
-
+  
   ## Subset to training and testing samples
   data_train <- data[as.numeric(unlist(folds[setdiff(seq(cross_fit_fold), i)])), ]
   data_test  <- data[as.numeric(unlist(folds[i])), ]
-
+  
   ## Train nuisance parameters
   nuisance <- train_nuisance_partial_id(data_train, S_vars, X_vars, Y_var, type, type_prop,
-                             prop_lb, prop_ub, nuisance_cv_fold,
-                             grf_honesty, grf_tune_parameters, grf_num_threads,
-                             xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads)
-
+                                        prop_lb, prop_ub, nuisance_cv_fold,
+                                        grf_honesty, grf_tune_parameters, grf_num_threads,
+                                        xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads)
+  
   ## Compute nuisance terms on test data and compile output into data frame
   print("Computing nuisance terms...")
   data_nuisance <- data_test %>% dplyr::select(all_of(c(Y_var, "treatment", "observe")))
@@ -162,55 +162,55 @@ compute_nuisance_on_fold_partial_id <- function(i, data, folds, S_vars, X_vars, 
   data_nuisance$mu_1U_s_x <- mapply(mu_s_x_partial_id, S = split(as.matrix(s), row(s)),
                                     X = split(as.matrix(x), row(x)),
                                     MoreArgs = list(mu_type = "1U",
-                                    varrho_s_x_out = nuisance$varrho_s_x,
-                                    data_train = data_train,
-                                    S_vars = S_vars, X_vars = X_vars,
-                                    Y_var = Y_var, type_prop = type_prop,
-                                    nuisance_cv_fold = nuisance_cv_fold,
-                                    prop_ub = prop_ub, prop_lb = prop_lb))
+                                                    varrho_s_x_out = nuisance$varrho_s_x,
+                                                    data_train = data_train,
+                                                    S_vars = S_vars, X_vars = X_vars,
+                                                    Y_var = Y_var, type_prop = type_prop,
+                                                    nuisance_cv_fold = nuisance_cv_fold,
+                                                    prop_ub = prop_ub, prop_lb = prop_lb))
   data_nuisance$mu_1L_s_x <- mapply(mu_s_x_partial_id, S = split(as.matrix(s), row(s)),
                                     X = split(as.matrix(x), row(x)),
                                     MoreArgs = list(mu_type = "1L",
-                                    varrho_s_x_out = nuisance$varrho_s_x,
-                                    data_train = data_train,
-                                    S_vars = S_vars, X_vars = X_vars,
-                                    Y_var = Y_var, type_prop = type_prop,
-                                    nuisance_cv_fold = nuisance_cv_fold,
-                                    prop_ub = prop_ub, prop_lb = prop_lb))
+                                                    varrho_s_x_out = nuisance$varrho_s_x,
+                                                    data_train = data_train,
+                                                    S_vars = S_vars, X_vars = X_vars,
+                                                    Y_var = Y_var, type_prop = type_prop,
+                                                    nuisance_cv_fold = nuisance_cv_fold,
+                                                    prop_ub = prop_ub, prop_lb = prop_lb))
   data_nuisance$mu_0U_s_x <- mapply(mu_s_x_partial_id, S = split(as.matrix(s), row(s)),
                                     X = split(as.matrix(x), row(x)),
                                     MoreArgs = list(mu_type = "0U",
-                                    varrho_s_x_out = nuisance$varrho_s_x,
-                                    data_train = data_train,
-                                    S_vars = S_vars, X_vars = X_vars,
-                                    Y_var = Y_var, type_prop = type_prop,
-                                    nuisance_cv_fold = nuisance_cv_fold,
-                                    prop_ub = prop_ub, prop_lb = prop_lb))
+                                                    varrho_s_x_out = nuisance$varrho_s_x,
+                                                    data_train = data_train,
+                                                    S_vars = S_vars, X_vars = X_vars,
+                                                    Y_var = Y_var, type_prop = type_prop,
+                                                    nuisance_cv_fold = nuisance_cv_fold,
+                                                    prop_ub = prop_ub, prop_lb = prop_lb))
   data_nuisance$mu_0L_s_x <- mapply(mu_s_x_partial_id, S = split(as.matrix(s), row(s)),
                                     X = split(as.matrix(x), row(x)),
                                     MoreArgs = list(mu_type = "0L",
-                                    varrho_s_x_out = nuisance$varrho_s_x,
-                                    data_train = data_train,
-                                    S_vars = S_vars, X_vars = X_vars,
-                                    Y_var = Y_var, type_prop = type_prop,
-                                    nuisance_cv_fold = nuisance_cv_fold,
-                                    prop_ub = prop_ub, prop_lb = prop_lb))
+                                                    varrho_s_x_out = nuisance$varrho_s_x,
+                                                    data_train = data_train,
+                                                    S_vars = S_vars, X_vars = X_vars,
+                                                    Y_var = Y_var, type_prop = type_prop,
+                                                    nuisance_cv_fold = nuisance_cv_fold,
+                                                    prop_ub = prop_ub, prop_lb = prop_lb))
   data_nuisance$q_U_s_x <- mapply(q_s_x, S = split(as.matrix(s), row(s)),
                                   X = split(as.matrix(x), row(x)),
                                   MoreArgs = list(q_type = "U",
-                                  data_train = data_train,
-                                  S_vars = S_vars, X_vars = X_vars,
-                                  Y_var = Y_var, type_prop = type_prop,
-                                  prop_ub = prop_ub, prop_lb = prop_lb,
-                                  varrho_s_x_out = nuisance$varrho_s_x))
+                                                  data_train = data_train,
+                                                  S_vars = S_vars, X_vars = X_vars,
+                                                  Y_var = Y_var, type_prop = type_prop,
+                                                  prop_ub = prop_ub, prop_lb = prop_lb,
+                                                  varrho_s_x_out = nuisance$varrho_s_x))
   data_nuisance$q_L_s_x <- mapply(q_s_x, S = split(as.matrix(s), row(s)),
                                   X = split(as.matrix(x), row(x)),
                                   MoreArgs = list(q_type = "L",
-                                  data_train = data_train,
-                                  S_vars = S_vars, X_vars = X_vars,
-                                  Y_var = Y_var, type_prop = type_prop,
-                                  prop_ub = prop_ub, prop_lb = prop_lb,
-                                  varrho_s_x_out = nuisance$varrho_s_x))
+                                                  data_train = data_train,
+                                                  S_vars = S_vars, X_vars = X_vars,
+                                                  Y_var = Y_var, type_prop = type_prop,
+                                                  prop_ub = prop_ub, prop_lb = prop_lb,
+                                                  varrho_s_x_out = nuisance$varrho_s_x))
   if(type == "glmnet"){
     if (ncol(x)==1) {
       x <- cbind(0,as.matrix(x))
@@ -225,12 +225,12 @@ compute_nuisance_on_fold_partial_id <- function(i, data, folds, S_vars, X_vars, 
     data_nuisance$bar_mu_0U_x <- predict(nuisance$bar_mu_0U_x, newdata = as.matrix(x))$predictions
     data_nuisance$bar_mu_0L_x <- predict(nuisance$bar_mu_0L_x, newdata = as.matrix(x))$predictions
   } else if(type == "xgboost"){
-    data_nuisance$bar_mu_1U_x <- predict(nuisance$bar_mu_1U_x, newdata = as.matrix(x))
-    data_nuisance$bar_mu_1L_x <- predict(nuisance$bar_mu_1L_x, newdata = as.matrix(x))
-    data_nuisance$bar_mu_0U_x <- predict(nuisance$bar_mu_0U_x, newdata = as.matrix(x))
-    data_nuisance$bar_mu_0L_x <- predict(nuisance$bar_mu_0L_x, newdata = as.matrix(x))
+    data_nuisance$bar_mu_1U_x <- predict(nuisance$bar_mu_1U_x, newdata = xgboost::xgb.DMatrix(as.matrix(x)))
+    data_nuisance$bar_mu_1L_x <- predict(nuisance$bar_mu_1L_x, newdata = xgboost::xgb.DMatrix(as.matrix(x)))
+    data_nuisance$bar_mu_0U_x <- predict(nuisance$bar_mu_0U_x, newdata = xgboost::xgb.DMatrix(as.matrix(x)))
+    data_nuisance$bar_mu_0L_x <- predict(nuisance$bar_mu_0L_x, newdata = xgboost::xgb.DMatrix(as.matrix(x)))
   }
-
+  
   if (type_prop == "glmnet") {
     if (ncol(x)==1) {
       x <- cbind(0,as.matrix(x))
@@ -245,19 +245,19 @@ compute_nuisance_on_fold_partial_id <- function(i, data, folds, S_vars, X_vars, 
     data_nuisance$phi_x    <- pmax(pmin(predict(nuisance$phi_x,      newdata = as.matrix(x_copy))$predictions,   prop_ub), prop_lb)
     data_nuisance$phi_s_x  <- pmax(pmin(predict(nuisance$phi_s_x,    newdata = as.matrix(s_x))$predictions,  prop_ub), prop_lb)
   } else if (type_prop == "xgboost") {
-    data_nuisance$varrho_x   <- pmax(pmin(predict(nuisance$varrho_x,     newdata = as.matrix(x_copy)),   prop_ub), prop_lb)
-    data_nuisance$varrho_s_x <- pmax(pmin(predict(nuisance$varrho_s_x,   newdata = as.matrix(s_x)), prop_ub), prop_lb)
-    data_nuisance$phi_x    <- pmax(pmin(predict(nuisance$phi_x,      newdata = as.matrix(x_copy)),   prop_ub), prop_lb)
-    data_nuisance$phi_s_x  <- pmax(pmin(predict(nuisance$phi_s_x,    newdata = as.matrix(s_x)),  prop_ub), prop_lb)
+    data_nuisance$varrho_x   <- pmax(pmin(predict(nuisance$varrho_x,     newdata = xgboost::xgb.DMatrix(as.matrix(x_copy))),   prop_ub), prop_lb)
+    data_nuisance$varrho_s_x <- pmax(pmin(predict(nuisance$varrho_s_x,   newdata = xgboost::xgb.DMatrix(as.matrix(s_x))), prop_ub), prop_lb)
+    data_nuisance$phi_x    <- pmax(pmin(predict(nuisance$phi_x,      newdata = xgboost::xgb.DMatrix(as.matrix(x_copy))),   prop_ub), prop_lb)
+    data_nuisance$phi_s_x  <- pmax(pmin(predict(nuisance$phi_s_x,    newdata = xgboost::xgb.DMatrix(as.matrix(s_x))),  prop_ub), prop_lb)
   }
   data_nuisance$phi    <- 1 - mean(data_train$observe)
   return(data_nuisance)
 }
 
 train_nuisance_partial_id <- function(data_train, S_vars, X_vars, Y_var, type, type_prop,
-                           prop_lb, prop_ub, nuisance_cv_fold,
-                           grf_honesty, grf_tune_parameters, grf_num_threads,
-                           xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads){
+                                      prop_lb, prop_ub, nuisance_cv_fold,
+                                      grf_honesty, grf_tune_parameters, grf_num_threads,
+                                      xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads){
   #### Train nuisance parameters
   ### Train Long-term outcome means
   ## \bar{\mu}(x)
@@ -266,7 +266,7 @@ train_nuisance_partial_id <- function(data_train, S_vars, X_vars, Y_var, type, t
   bar_mu_1L_x_out <- bar_mu_x_partial_id(mu_type = "1L", data_train, treatment_val = 1, S_vars, X_vars, Y_var, type, type_prop, prop_lb, prop_ub, nuisance_cv_fold, grf_honesty, grf_tune_parameters, grf_num_threads, xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads)
   bar_mu_0U_x_out <- bar_mu_x_partial_id(mu_type = "0U", data_train, treatment_val = 0, S_vars, X_vars, Y_var, type, type_prop, prop_lb, prop_ub, nuisance_cv_fold, grf_honesty, grf_tune_parameters, grf_num_threads, xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads)
   bar_mu_0L_x_out <- bar_mu_x_partial_id(mu_type = "0L", data_train, treatment_val = 0, S_vars, X_vars, Y_var, type, type_prop, prop_lb, prop_ub, nuisance_cv_fold, grf_honesty, grf_tune_parameters, grf_num_threads, xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads)
-
+  
   ### Train Propensity Scores
   print("Training propensity score models...")
   varrho_x_out   <- varrho_x(data_train, X_vars, type_prop,
@@ -281,7 +281,7 @@ train_nuisance_partial_id <- function(data_train, S_vars, X_vars, Y_var, type, t
   phi_s_x_out  <- phi_s_x(data_train, X_vars, S_vars, type_prop,
                           nuisance_cv_fold, grf_honesty, grf_tune_parameters, grf_num_threads,
                           xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads)
-
+  
   ### Package nuisance estimates
   return(list(bar_mu_1U_x = bar_mu_1U_x_out,
               bar_mu_1L_x = bar_mu_1L_x_out,
@@ -296,12 +296,12 @@ compute_tau_partial_id <- function(data_nuisance, Y_var, tau_type){
     m <- data_nuisance %>%
       dplyr::mutate(Y = .data[[Y_var]]) %>%
       dplyr::mutate(m_0_a = ((1-observe) / phi)*((treatment/varrho_x)*(mu_1U_s_x - bar_mu_1U_x)
-                                          - ((1-treatment)/(1-varrho_x))*(mu_0L_s_x - bar_mu_0L_x)),
-             m_0_b = ((1-observe) / phi)*(bar_mu_1U_x - bar_mu_0L_x),
-             m_0_c = (observe / phi)*(phi_s_x / (1-phi_s_x))*( (varrho_s_x/varrho_x)*(H_y_s("U", Y, q_U_s_x, varrho_s_x) - mu_1U_s_x) - ((1-varrho_s_x)/(1-varrho_x))*(H_y_s("L", Y, q_U_s_x, (1-varrho_s_x)) - mu_0L_s_x) ),
-             m_0_d = ((1-observe) / phi)*(1/varrho_x)*(q_U_s_x - mu_1U_s_x)*(treatment - varrho_s_x),
-             m_0_e = ((1-observe) / phi)*(1/(1-varrho_x))*(q_U_s_x - mu_0L_s_x)*(treatment - varrho_s_x),
-             m_0 = m_0_a + m_0_b + m_0_c + m_0_d + m_0_e) %>%
+                                                 - ((1-treatment)/(1-varrho_x))*(mu_0L_s_x - bar_mu_0L_x)),
+                    m_0_b = ((1-observe) / phi)*(bar_mu_1U_x - bar_mu_0L_x),
+                    m_0_c = (observe / phi)*(phi_s_x / (1-phi_s_x))*( (varrho_s_x/varrho_x)*(H_y_s("U", Y, q_U_s_x, varrho_s_x) - mu_1U_s_x) - ((1-varrho_s_x)/(1-varrho_x))*(H_y_s("L", Y, q_U_s_x, (1-varrho_s_x)) - mu_0L_s_x) ),
+                    m_0_d = ((1-observe) / phi)*(1/varrho_x)*(q_U_s_x - mu_1U_s_x)*(treatment - varrho_s_x),
+                    m_0_e = ((1-observe) / phi)*(1/(1-varrho_x))*(q_U_s_x - mu_0L_s_x)*(treatment - varrho_s_x),
+                    m_0 = m_0_a + m_0_b + m_0_c + m_0_d + m_0_e) %>%
       dplyr::select(m_0)
     multiplier <- mean((1-data_nuisance$observe))/data_nuisance$phi[1]  # phi column is constant, take the first
     return(mean(m$m_0)/multiplier)
@@ -309,12 +309,12 @@ compute_tau_partial_id <- function(data_nuisance, Y_var, tau_type){
     m <- data_nuisance %>%
       dplyr::mutate(Y = .data[[Y_var]]) %>%
       dplyr::mutate(m_0_a = ((1-observe) / phi)*((treatment/varrho_x)*(mu_1L_s_x - bar_mu_1L_x)
-                                          - ((1-treatment)/(1-varrho_x))*(mu_0U_s_x - bar_mu_0U_x)),
-             m_0_b = ((1-observe) / phi)*(bar_mu_1L_x - bar_mu_0U_x),
-             m_0_c = (observe / phi)*(phi_s_x / (1-phi_s_x))*( (varrho_s_x/varrho_x)*(H_y_s("L", Y, q_L_s_x, varrho_s_x) - mu_1L_s_x) - ((1-varrho_s_x)/(1-varrho_x))*(H_y_s("U", Y, q_L_s_x, (1-varrho_s_x)) - mu_0U_s_x) ),
-             m_0_d = ((1-observe) / phi)*(1/varrho_x)*(q_L_s_x - mu_1L_s_x)*(treatment - varrho_s_x),
-             m_0_e = ((1-observe) / phi)*(1/(1-varrho_x))*(q_L_s_x - mu_0U_s_x)*(treatment - varrho_s_x),
-             m_0 = m_0_a + m_0_b + m_0_c + m_0_d + m_0_e) %>%
+                                                 - ((1-treatment)/(1-varrho_x))*(mu_0U_s_x - bar_mu_0U_x)),
+                    m_0_b = ((1-observe) / phi)*(bar_mu_1L_x - bar_mu_0U_x),
+                    m_0_c = (observe / phi)*(phi_s_x / (1-phi_s_x))*( (varrho_s_x/varrho_x)*(H_y_s("L", Y, q_L_s_x, varrho_s_x) - mu_1L_s_x) - ((1-varrho_s_x)/(1-varrho_x))*(H_y_s("U", Y, q_L_s_x, (1-varrho_s_x)) - mu_0U_s_x) ),
+                    m_0_d = ((1-observe) / phi)*(1/varrho_x)*(q_L_s_x - mu_1L_s_x)*(treatment - varrho_s_x),
+                    m_0_e = ((1-observe) / phi)*(1/(1-varrho_x))*(q_L_s_x - mu_0U_s_x)*(treatment - varrho_s_x),
+                    m_0 = m_0_a + m_0_b + m_0_c + m_0_d + m_0_e) %>%
       dplyr::select(m_0)
     multiplier <- mean((1-data_nuisance$observe))/data_nuisance$phi[1]  # phi column is constant, take the first
     return(mean(m$m_0)/multiplier)
@@ -326,23 +326,23 @@ compute_m_table_partial_id <- function(tau_0, data_nuisance, Y_var, tau_type){
     m <- data_nuisance %>%
       dplyr::mutate(Y = .data[[Y_var]]) %>%
       dplyr::mutate(m_0_a = ((1-observe) / phi)*((treatment/varrho_x)*(mu_1U_s_x - bar_mu_1U_x)
-                                           - ((1-treatment)/(1-varrho_x))*(mu_0L_s_x - bar_mu_0L_x)),
-             m_0_b = ((1-observe) / phi)*(bar_mu_1U_x - bar_mu_0L_x - tau_0),
-             m_0_c = (observe / phi)*(phi_s_x / (1-phi_s_x))*( (varrho_s_x/varrho_x)*(H_y_s("U", Y, q_U_s_x, varrho_s_x) - mu_1U_s_x) - ((1-varrho_s_x)/(1-varrho_x))*(H_y_s("L", Y, q_U_s_x, (1-varrho_s_x)) - mu_0L_s_x) ),
-             m_0_d = ((1-observe) / phi)*(1/varrho_x)*(q_U_s_x - mu_1U_s_x)*(treatment - varrho_s_x),
-             m_0_e = ((1-observe) / phi)*(1/(1-varrho_x))*(q_U_s_x - mu_0L_s_x)*(treatment - varrho_s_x),
-             m_0 = m_0_a + m_0_b + m_0_c + m_0_d + m_0_e) %>%
+                                                 - ((1-treatment)/(1-varrho_x))*(mu_0L_s_x - bar_mu_0L_x)),
+                    m_0_b = ((1-observe) / phi)*(bar_mu_1U_x - bar_mu_0L_x - tau_0),
+                    m_0_c = (observe / phi)*(phi_s_x / (1-phi_s_x))*( (varrho_s_x/varrho_x)*(H_y_s("U", Y, q_U_s_x, varrho_s_x) - mu_1U_s_x) - ((1-varrho_s_x)/(1-varrho_x))*(H_y_s("L", Y, q_U_s_x, (1-varrho_s_x)) - mu_0L_s_x) ),
+                    m_0_d = ((1-observe) / phi)*(1/varrho_x)*(q_U_s_x - mu_1U_s_x)*(treatment - varrho_s_x),
+                    m_0_e = ((1-observe) / phi)*(1/(1-varrho_x))*(q_U_s_x - mu_0L_s_x)*(treatment - varrho_s_x),
+                    m_0 = m_0_a + m_0_b + m_0_c + m_0_d + m_0_e) %>%
       return()
   } else {
     m <- data_nuisance %>%
       dplyr::mutate(Y = .data[[Y_var]]) %>%
       dplyr::mutate(m_0_a = ((1-observe) / phi)*((treatment/varrho_x)*(mu_1L_s_x - bar_mu_1L_x)
-                                          - ((1-treatment)/(1-varrho_x))*(mu_0U_s_x - bar_mu_0U_x)),
-             m_0_b = ((1-observe) / phi)*(bar_mu_1L_x - bar_mu_0U_x - tau_0),
-             m_0_c = (observe / phi)*(phi_s_x / (1-phi_s_x))*( (varrho_s_x/varrho_x)*(H_y_s("L", Y, q_L_s_x, varrho_s_x) - mu_1L_s_x) - ((1-varrho_s_x)/(1-varrho_x))*(H_y_s("U", Y, q_L_s_x, (1-varrho_s_x)) - mu_0U_s_x) ),
-             m_0_d = ((1-observe) / phi)*(1/varrho_x)*(q_L_s_x - mu_1L_s_x)*(treatment - varrho_s_x),
-             m_0_e = ((1-observe) / phi)*(1/(1-varrho_x))*(q_L_s_x - mu_0U_s_x)*(treatment - varrho_s_x),
-             m_0 = m_0_a + m_0_b + m_0_c + m_0_d + m_0_e) %>%
+                                                 - ((1-treatment)/(1-varrho_x))*(mu_0U_s_x - bar_mu_0U_x)),
+                    m_0_b = ((1-observe) / phi)*(bar_mu_1L_x - bar_mu_0U_x - tau_0),
+                    m_0_c = (observe / phi)*(phi_s_x / (1-phi_s_x))*( (varrho_s_x/varrho_x)*(H_y_s("L", Y, q_L_s_x, varrho_s_x) - mu_1L_s_x) - ((1-varrho_s_x)/(1-varrho_x))*(H_y_s("U", Y, q_L_s_x, (1-varrho_s_x)) - mu_0U_s_x) ),
+                    m_0_d = ((1-observe) / phi)*(1/varrho_x)*(q_L_s_x - mu_1L_s_x)*(treatment - varrho_s_x),
+                    m_0_e = ((1-observe) / phi)*(1/(1-varrho_x))*(q_L_s_x - mu_0U_s_x)*(treatment - varrho_s_x),
+                    m_0 = m_0_a + m_0_b + m_0_c + m_0_d + m_0_e) %>%
       return()
   }
 }

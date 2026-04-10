@@ -61,24 +61,24 @@ h_s_x_y <- function(W, S, X, Y, varrho_s_x_out, data_train, S_vars, X_vars, Y_va
       return(((-1)/(w-v)) * numerator / denominator)
     }
   }
-
+  
   sigma <- function(w, u, v) {
     return((1/(w-v)) * (w - cond_copula(u, v)))
   }
-
+  
   # predict eta=1-rho(X,S) on the given data point
   new_values <- c(unlist(S), unlist(X))
   named_values <- setNames(new_values, c(S_vars, X_vars))
   new_data <- as.matrix(t(named_values))
-
+  
   if (type_prop == "glmnet") {
     eta <- 1-pmax(pmin(predict(varrho_s_x_out, newx = new_data, s = varrho_s_x_out$lambda.min, type = "response"), prop_ub), prop_lb)
   } else if (type_prop == "grf") {
     eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = new_data)$predictions, prop_ub), prop_lb)
   } else if (type_prop == "xgboost") {
-    eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = new_data), prop_ub), prop_lb)
+    eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(new_data)), prop_ub), prop_lb)
   }
-
+  
   # Integral approximation
   u_vals <- seq(0.01, 0.99, length.out = integralMaxEval)
   quantile_vals <- cond_quantile_forest(u_vals, S, X, data_train, S_vars, X_vars, Y_var)
@@ -98,12 +98,12 @@ h_s_x_y <- function(W, S, X, Y, varrho_s_x_out, data_train, S_vars, X_vars, Y_va
     stop("h_s_x_y: Case currently not supported.")
   }
   prod_vals <- sum_vals*sapply(u_vals, function(u) d_sigma(W, u, eta))
-
+  
   counter <<- counter+1
   if (counter %% 100 == 0) {
     print(paste0("h_s_x_y progress: ", 100*counter/total, "%"))  # show progress
   }
-
+  
   if (cop == "Frank") { # 4 cases
     if (param < 0) {
       if (W == 1) { # (1) V stochastically decreasing in U and W=1
@@ -143,16 +143,16 @@ mu_s_x_copula <- function(W, S, X, varrho_s_x_out, eta = NULL, data_train, S_var
     new_values <- c(unlist(S), unlist(X))
     named_values <- setNames(new_values, c(S_vars, X_vars))
     new_data <- as.matrix(t(named_values))
-
+    
     if (type_prop == "glmnet") {
       eta <- 1-pmax(pmin(predict(varrho_s_x_out, newx = new_data, s = varrho_s_x_out$lambda.min, type = "response"), prop_ub), prop_lb)
     } else if (type_prop == "grf") {
       eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = new_data)$predictions, prop_ub), prop_lb)
     } else if (type_prop == "xgboost") {
-      eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = new_data), prop_ub), prop_lb)
+      eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(new_data)), prop_ub), prop_lb)
     }
   }
-
+  
   if (cop == "Frank") {
     g_fn <- function(u) {
       return(exp(-u*param) - 1)
@@ -174,25 +174,25 @@ mu_s_x_copula <- function(W, S, X, varrho_s_x_out, eta = NULL, data_train, S_var
   sigma <- function(w, u, v) {
     return((1/(w-v)) * (w - cond_copula(u, v)))
   }
-
+  
   # Integral approximation
   u_vals <- seq(0.01, 0.99, length.out = integralMaxEval)
   quantile_vals <- cond_quantile_forest(u_vals, S, X, data_train, S_vars, X_vars, Y_var)
   prod_vals <- quantile_vals*sapply(u_vals, function(u) sigma(W, u, eta))
-
+  
   counter <<- counter+1
   if (counter %% 100 == 0) {
     print(paste0("mu_s_x_copula progress: ", 100*counter/total, "%"))  # show progress
     curr_time <<- Sys.time()
   }
-
+  
   return(approx_integral(y_vals = prod_vals, upperLimit = 0.99, lowerLimit = 0.01))
 }
 
 bar_mu_x_copula <- function(nuisance_type, W, data_train, S_vars, X_vars, Y_var, nuisance_cv_fold,
-                     type_prop, prop_ub, prop_lb, integralMaxEval, cop, param,
-                     grf_honesty, grf_tune_parameters, grf_num_threads,
-                     xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads) {
+                            type_prop, prop_ub, prop_lb, integralMaxEval, cop, param,
+                            grf_honesty, grf_tune_parameters, grf_num_threads,
+                            xgb_cv_rounds, xgb_eta, xgb_max_depth, xgb_threads) {
   # Cross-fitting within the training data
   df <- dplyr::filter(data_train, observe == 0)
   df_0 <- df[df$treatment == 0,]
@@ -205,7 +205,7 @@ bar_mu_x_copula <- function(nuisance_type, W, data_train, S_vars, X_vars, Y_var,
   df <- rbind(df_0, df_1)
   folds <- split(1:nrow(df), df$fold) # balanced data split
   etas <- rep(NA, nrow(df))
-
+  
   # Perform cross-fitting for rho(S_i, X_i)
   for (j in seq_along(folds)) {
     test_idx <- folds[[j]]
@@ -220,10 +220,13 @@ bar_mu_x_copula <- function(nuisance_type, W, data_train, S_vars, X_vars, Y_var,
     } else if (type_prop == "grf") {
       etas[test_idx] <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = test_s_x)$predictions, prop_ub), prop_lb)
     } else if (type_prop == "xgboost") {
-      etas[test_idx] <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = test_s_x[, varrho_s_x_out$feature_names]), prop_ub), prop_lb)
+      test_mat <- data.matrix(test_s_x[, c(S_vars, X_vars)])
+      etas[test_idx] <- 1 - pmax(pmin(
+        predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(test_mat)),
+        prop_ub), prop_lb)
     }
   }
-
+  
   s <- dplyr::select(df, all_of(S_vars))
   x <- dplyr::select(df, all_of(X_vars))
   counter <<- 0
@@ -244,12 +247,12 @@ bar_mu_x_copula <- function(nuisance_type, W, data_train, S_vars, X_vars, Y_var,
     # ensure column matrix shape
     x_mat <- as.matrix(x)
     mu_vec <- as.numeric(mu)
-
+    
     # keep only finite rows in both x and r
     row_ok <- is.finite(mu_vec) & apply(x_mat, 1, function(z) all(is.finite(z)))
     x_mat <- x_mat[row_ok, , drop = FALSE]
     mu_vec <- mu_vec[row_ok]
-
+    
     # guard empty or degenerate after filtering
     if (length(mu_vec) == 0L) {
       bar_mu_x_model <- mean(mu, na.rm = TRUE)  # everything was non-finite; safest fallback
@@ -258,7 +261,7 @@ bar_mu_x_copula <- function(nuisance_type, W, data_train, S_vars, X_vars, Y_var,
     } else {
       # glmnet dislikes single-column without intercept sometimes; pad if needed
       if (ncol(x_mat) == 1L) x_mat <- cbind(zeros = 0, x_mat)
-
+      
       # try CV glmnet, fall back to plain glmnet; final fallback = constant mean
       bar_mu_x_model <- tryCatch({
         glmnet::cv.glmnet(x = x_mat, y = mu_vec, nfolds = nuisance_cv_fold)
@@ -383,7 +386,7 @@ d_s_x <- function(S, X, varrho_s_x_out, data_train, S_vars, X_vars, Y_var, type_
   # predict eta=1-rho(X,S) on the given data point
   new_values <- c(unlist(S), unlist(X))
   named_values <- setNames(new_values, c(S_vars, X_vars))
-
+  
   if (type_prop == "glmnet") {
     new_data <- as.matrix(t(named_values))
     eta <- 1-pmax(pmin(predict(varrho_s_x_out, newx = new_data, s = varrho_s_x_out$lambda.min, type = "response"), prop_ub), prop_lb)
@@ -392,9 +395,9 @@ d_s_x <- function(S, X, varrho_s_x_out, data_train, S_vars, X_vars, Y_var, type_
     eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = new_data)$predictions, prop_ub), prop_lb)
   } else if (type_prop == "xgboost"){
     new_data <- as.matrix(t(named_values))
-    eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = new_data), prop_ub), prop_lb)
+    eta <- 1-pmax(pmin(predict(varrho_s_x_out, newdata = xgboost::xgb.DMatrix(new_data)), prop_ub), prop_lb)
   }
-
+  
   # Compute c(v|u) = c(u,v)
   if (cop == "Frank") {
     cond_copula_dens <- function(u, v) {
@@ -422,11 +425,11 @@ d_s_x <- function(S, X, varrho_s_x_out, data_train, S_vars, X_vars, Y_var, type_
       return(numerator / denominator)
     }
   }
-
+  
   u_vals <- seq(0.01, 0.99, length.out = integralMaxEval)
   quantile_vals <- cond_quantile_forest(u_vals, S, X, data_train, S_vars, X_vars, Y_var)
   prod_vals <- quantile_vals*sapply(u_vals, function(u) cond_copula_dens(u, eta))
-
+  
   counter <<- counter+1
   if (counter %% 100 == 0) {
     print(paste0("d_s_x progress: ", 100*counter/total, "%"))  # show progress

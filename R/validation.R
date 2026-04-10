@@ -77,6 +77,12 @@
     cross_fit_fold, nuisance_cv_fold
 ) {
   if (!is.data.frame(data)) stop("`data` must be a data.frame.")
+  if (!is.character(S_vars) || length(S_vars) < 1L) {
+    stop("`S_vars` must be a non-empty character vector of column names.")
+  }
+  if (!is.character(X_vars) || length(X_vars) < 1L) {
+    stop("`X_vars` must be a non-empty character vector of column names.")
+  }
   required_cols <- unique(c("treatment", "observe", S_vars, X_vars, Y_var))
   missing_cols <- setdiff(required_cols, names(data))
   if (length(missing_cols) > 0) {

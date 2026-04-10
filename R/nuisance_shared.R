@@ -16,16 +16,21 @@ varrho_x <- function(data_train, X_vars, type_prop,
     varrho_x <- glmnet::cv.glmnet(x = as.matrix(x), y = as.matrix(w), family = "binomial", nfolds = nuisance_cv_fold)
   } else if(type_prop == "grf"){
     varrho_x <- grf::regression_forest(X = as.matrix(x), Y = as.matrix(w),
-                                  num.threads = grf_num_threads, ci.group.size = 1,
-                                  honesty = grf_honesty, tune.parameters = grf_tune_parameters)
+                                       num.threads = grf_num_threads, ci.group.size = 1,
+                                       honesty = grf_honesty, tune.parameters = grf_tune_parameters)
   } else if(type_prop == "xgboost"){
-    cv <- xgboost::xgb.cv(data = as.matrix(x), label = as.matrix(w), eval_metric = "logloss",
-                 max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads,
-                 nrounds = xgb_cv_rounds, verbose = FALSE, nfold = nuisance_cv_fold)
-    varrho_x <- xgboost::xgboost(data = as.matrix(x), label = as.matrix(w), eval_metric = "logloss",
-                        max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads,
-                        nrounds = which.min(cv$evaluation_log$test_logloss_mean),
-                        objective = "binary:logistic", verbose = FALSE)
+    dtrain <- xgboost::xgb.DMatrix(data = as.matrix(x), label = as.numeric(as.matrix(w)))
+    cv <- xgboost::xgb.cv(
+      data = dtrain,
+      params = list(objective = "binary:logistic", eval_metric = "logloss",
+                    max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads),
+      nrounds = xgb_cv_rounds, verbose = FALSE, nfold = nuisance_cv_fold)
+    varrho_x <- xgboost::xgb.train(
+      data = dtrain,
+      params = list(objective = "binary:logistic", eval_metric = "logloss",
+                    max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads),
+      nrounds = which.min(cv$evaluation_log$test_logloss_mean),
+      verbose = FALSE)
   } else {
     stop('Enter a valid nuisance parameter estimation type')
   }
@@ -47,15 +52,20 @@ varrho_s_x <- function(data_train, X_vars, S_vars, type_prop,
     varrho_s_x <- glmnet::cv.glmnet(x = as.matrix(s_x), y = as.matrix(w), family = "binomial", nfolds = nuisance_cv_fold)
   } else if(type_prop == "grf"){
     varrho_s_x <- grf::regression_forest(X = as.matrix(s_x), Y = as.matrix(w), num.threads = grf_num_threads,
-                                    ci.group.size = 1, honesty = grf_honesty, tune.parameters = grf_tune_parameters)
+                                         ci.group.size = 1, honesty = grf_honesty, tune.parameters = grf_tune_parameters)
   } else if(type_prop == "xgboost"){
-    cv <- xgboost::xgb.cv(data = as.matrix(s_x), label = as.matrix(w), eval_metric = "logloss",
-                 max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads,
-                 nrounds = xgb_cv_rounds, verbose = FALSE, nfold = nuisance_cv_fold)
-    varrho_s_x <- xgboost::xgboost(data = as.matrix(s_x), label = as.matrix(w), eval_metric = "logloss",
-                          max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads,
-                          nrounds = which.min(cv$evaluation_log$test_logloss_mean),
-                          objective = "binary:logistic", verbose = FALSE)
+    dtrain <- xgboost::xgb.DMatrix(data = as.matrix(s_x), label = as.numeric(as.matrix(w)))
+    cv <- xgboost::xgb.cv(
+      data = dtrain,
+      params = list(objective = "binary:logistic", eval_metric = "logloss",
+                    max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads),
+      nrounds = xgb_cv_rounds, verbose = FALSE, nfold = nuisance_cv_fold)
+    varrho_s_x <- xgboost::xgb.train(
+      data = dtrain,
+      params = list(objective = "binary:logistic", eval_metric = "logloss",
+                    max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads),
+      nrounds = which.min(cv$evaluation_log$test_logloss_mean),
+      verbose = FALSE)
   } else {
     stop('Enter a valid nuisance parameter estimation type')
   }
@@ -79,15 +89,20 @@ phi_x <- function(data_train, X_vars, type_prop,
     phi_x <- glmnet::cv.glmnet(x = as.matrix(x), y = as.matrix(g), family = "binomial", nfolds = nuisance_cv_fold)
   } else if(type_prop == "grf"){
     phi_x <- grf::regression_forest(X = as.matrix(x), Y = as.matrix(g), num.threads = grf_num_threads,
-                               ci.group.size = 1, honesty = grf_honesty, tune.parameters = grf_tune_parameters)
+                                    ci.group.size = 1, honesty = grf_honesty, tune.parameters = grf_tune_parameters)
   } else if(type_prop == "xgboost"){
-    cv <- xgboost::xgb.cv(data = as.matrix(x), label = as.matrix(g), eval_metric = "logloss",
-                 max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads,
-                 nrounds = xgb_cv_rounds, verbose = FALSE, nfold = nuisance_cv_fold)
-    phi_x <- xgboost::xgboost(data = as.matrix(x), label = as.matrix(g), eval_metric = "logloss",
-                     max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads,
-                     nrounds = which.min(cv$evaluation_log$test_logloss_mean),
-                     objective = "binary:logistic", verbose = FALSE)
+    dtrain <- xgboost::xgb.DMatrix(data = as.matrix(x), label = as.numeric(as.matrix(g)))
+    cv <- xgboost::xgb.cv(
+      data = dtrain,
+      params = list(objective = "binary:logistic", eval_metric = "logloss",
+                    max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads),
+      nrounds = xgb_cv_rounds, verbose = FALSE, nfold = nuisance_cv_fold)
+    phi_x <- xgboost::xgb.train(
+      data = dtrain,
+      params = list(objective = "binary:logistic", eval_metric = "logloss",
+                    max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads),
+      nrounds = which.min(cv$evaluation_log$test_logloss_mean),
+      verbose = FALSE)
   } else {
     stop('Enter a valid nuisance parameter estimation type')
   }
@@ -108,15 +123,20 @@ phi_s_x <- function(data_train, X_vars, S_vars, type_prop,
     phi_s_x <- glmnet::cv.glmnet(x = as.matrix(s_x), y = as.matrix(g), family = "binomial", nfolds = nuisance_cv_fold)
   } else if(type_prop == "grf"){
     phi_s_x <- grf::regression_forest(X = as.matrix(s_x), Y = as.matrix(g), num.threads = grf_num_threads,
-                                 ci.group.size = 1, honesty = grf_honesty, tune.parameters = grf_tune_parameters)
+                                      ci.group.size = 1, honesty = grf_honesty, tune.parameters = grf_tune_parameters)
   } else if(type_prop == "xgboost"){
-    cv <- xgboost::xgb.cv(data = as.matrix(s_x), label = as.matrix(g), eval_metric = "logloss",
-                 max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads,
-                 nrounds = xgb_cv_rounds, verbose = FALSE, nfold = nuisance_cv_fold)
-    phi_s_x <- xgboost::xgboost(data = as.matrix(s_x), label = as.matrix(g), eval_metric = "logloss",
-                       max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads,
-                       nrounds = which.min(cv$evaluation_log$test_logloss_mean),
-                       objective = "binary:logistic", verbose = FALSE)
+    dtrain <- xgboost::xgb.DMatrix(data = as.matrix(s_x), label = as.numeric(as.matrix(g)))
+    cv <- xgboost::xgb.cv(
+      data = dtrain,
+      params = list(objective = "binary:logistic", eval_metric = "logloss",
+                    max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads),
+      nrounds = xgb_cv_rounds, verbose = FALSE, nfold = nuisance_cv_fold)
+    phi_s_x <- xgboost::xgb.train(
+      data = dtrain,
+      params = list(objective = "binary:logistic", eval_metric = "logloss",
+                    max_depth = xgb_max_depth, eta = xgb_eta, nthread = xgb_threads),
+      nrounds = which.min(cv$evaluation_log$test_logloss_mean),
+      verbose = FALSE)
   } else {
     stop('Enter a valid nuisance parameter estimation type')
   }
