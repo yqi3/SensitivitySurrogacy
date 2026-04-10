@@ -7,4 +7,13 @@ Python implementation of the SensitivitySurrogacy R package for sensitivity anal
 ```bash
 git clone https://github.com/yqi3/SensitivitySurrogacy.git
 cd SensitivitySurrogacy/python
-pip install -e .
+pip install --upgrade pip
+pip install .
+```
+
+It is recommended to install in a virtual environment:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate    # On Windows: .venv\Scripts\activate
+pip install --upgrade pip
+pip install .
